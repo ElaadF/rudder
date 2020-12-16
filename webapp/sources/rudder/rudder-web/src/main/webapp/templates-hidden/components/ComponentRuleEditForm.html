@@ -226,6 +226,7 @@
                     data-original-title="<h4>Policy Mode </h4><div class='tooltip-content policy-mode {{directive.mode}}'><div>This directive is in <b>{{directive.mode}}</b> mode.</div></div>"
                   ></span>
                   <span class="target-name"> {{ directive.name }} </span>
+                  <a ng-if="!directive.isEnabled">Disabled</a>
                 </a>
                 <i class="fa fa-question-circle targetIcon icon-info"
                    data-toggle="tooltip"
