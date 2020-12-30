@@ -57,8 +57,11 @@ import net.liftweb.json._
 import com.normation.errors._
 import cats.implicits._
 import com.normation.rudder.domain.nodes.GenericProperty
+import com.normation.rudder.domain.nodes.GenericProperty.StringToConfigValue
+import com.normation.rudder.services.nodes.RudderPropertyEngine
 import com.typesafe.config.ConfigValue
-
+import net.liftweb.json.JsonDSL._
+import zio.syntax.ToZio
 
 /**
  * Test how parametrized variables are replaced for
@@ -68,6 +71,13 @@ import com.typesafe.config.ConfigValue
 
 @RunWith(classOf[JUnitRunner])
 class TestNodeAndGlobalParameterLookup extends Specification {
+
+  class FakeEncryptedPasswordEngine extends RudderPropertyEngine {
+    override def name: String = "fakeEncryptorEngineTesting"
+
+    override def process(namespace: List[String], parameters: ConfigValue): IOResult[String] = "encrypted-string-test" .succeed
+
+  }
 
   //matcher for failure
   def beFailure[T](r: Regex) = new Matcher[Box[T]] {
@@ -92,6 +102,11 @@ class TestNodeAndGlobalParameterLookup extends Specification {
   //rule lookup, node tested here.
   val compiler = new InterpolatedValueCompilerImpl()
   val lookupService = new RuleValServiceImpl(compiler)
+  val data = new TestNodeConfiguration()
+  val buildContext              = new PromiseGeneration_BuildNodeContext {
+    override def interpolatedValueCompiler: InterpolatedValueCompiler = compiler
+    override def systemVarService: SystemVariableService = data.systemVariableService
+  }
 
   val context = ParamInterpolationContext(
       parameters      = Map()
@@ -248,6 +263,59 @@ class TestNodeAndGlobalParameterLookup extends Specification {
     "parse a non valid cfengine variable as a string" in {
       test(all(_), """${something . cfengine}""", List(CharSeq("${something . cfengine"), CharSeq("}")))
     }
+
+    "parse a valid engine" in {
+      test(
+        all(_)
+        , """${rudder.engine[foo]("tst")}"""
+        , List(RudderEngine("foo", List.empty, "tst".toConfigValue))
+      )
+    }
+
+    "parse a valid engine with methods" in {
+      test(
+        all(_)
+        , """${rudder.engine[foo][bar]("toto")}"""
+        , List(RudderEngine("foo", List("bar"), "toto".toConfigValue))
+      )
+    }
+
+    "parse an engine with space" in {
+      test(
+        all(_)
+        , """${rudder . engine [ foo ] [ bar] (  "bar" ) }"""
+        , List(RudderEngine("foo", List("bar"), "bar".toConfigValue))
+      )
+    }
+
+    "parse an engine with multiple method" in {
+      test(
+        all(_)
+        , """${rudder.engine[foo][bar][baz]("toto")}"""
+        , List(RudderEngine("foo", List("bar", "baz"), "toto".toConfigValue))
+      )
+    }
+
+    "parse engine with UTF-8 parameter" in {
+      val s = """${rudder.engine[foo]("emo😄ji")}"""
+      test(all(_), s, List(RudderEngine("foo", List.empty, "emo😄ji".toConfigValue)))
+    }
+
+    "fails when an engine with empty method between" in {
+      val s = """${rudder.engine[foo][][bar]("test")}"""
+      PropertyParser.parse(s) must beLeft
+    }
+
+    "fails when an engine with empty method at the end" in {
+      val s = """${rudder.engine[foo][bar][]("test")}"""
+      PropertyParser.parse(s) must beLeft
+    }
+
+    "fails when an engine with empty method at the beginning" in {
+      val s = """${rudder.engine[][foo][bar]("test")}"""
+      PropertyParser.parse(s) must beLeft
+    }
+
 
     "parse blank test" in {
       test(all(_), "      ",
@@ -653,6 +721,22 @@ class TestNodeAndGlobalParameterLookup extends Specification {
       }
     }
 
+    "replace json parameter for secret engine" in {
+      val json =   {
+        (   ("login"           -> "admin")
+          ~ ("password"       -> "${rudder.engine[secret](\"someId\")}")
+          )
+      }
+
+      val jsonRes =   {
+        (   ("login"           -> "admin")
+          ~ ("password"       -> "encrypted-string-test")
+          )
+      }
+      //"""{"login": "admin","password": "${rudder.engine[secret](\"someId\")}"}"""
+      buildContext.parseJValue(json, toNodeContext(context, Map())) must beEqualTo(jsonRes)
+    }
+
   }
 
   "A single parameter" should {
@@ -702,13 +786,13 @@ class TestNodeAndGlobalParameterLookup extends Specification {
 
     "fails when the part after ${rudder.} is empty" in {
       getError(lookupParam(Seq(badEmptyRudder), context)) must beMatching(
-        """.*\Q'== ${rudder.} =='. Error message is: Expected (rudderNode | parameters | oldParameter):1:13, found "} =="\E.*""".r
+        """.*\Q'== ${rudder.} =='. Error message is: Expected (rudderNode | parameters | oldParameter | rudderEngine):1:13, found "} =="\E.*""".r
       )
     }
 
     "fails when the part after ${rudder.} is not recognised" in {
       getError(lookupParam(Seq(badUnknown), context.copy(parameters = p(fooParam)))) must beMatching(
-         """.*\Q'== ${rudder.foo} =='. Error message is: Expected (rudderNode | parameters | oldParameter):1:13, found "foo} =="\E.*""".r
+         """.*\Q'== ${rudder.foo} =='. Error message is: Expected (rudderNode | parameters | oldParameter | rudderEngine):1:13, found "foo} =="\E.*""".r
       )
     }
   }

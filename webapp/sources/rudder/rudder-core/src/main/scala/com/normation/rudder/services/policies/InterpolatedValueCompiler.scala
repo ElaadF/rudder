@@ -41,12 +41,19 @@ package com.normation.rudder.services.policies
 import com.normation.box._
 import com.normation.errors._
 import com.normation.inventory.domain.AgentType
-import com.normation.rudder.domain.policies.PolicyModeOverrides
-import com.normation.rudder.services.policies.PropertyParserTokens._
-import net.liftweb.common._
 import com.normation.rudder.domain.nodes.GenericProperty
+import com.normation.rudder.domain.nodes.GenericProperty.StringToConfigValue
+import com.normation.rudder.domain.policies.PolicyModeOverrides
+import com.normation.rudder.services.nodes.PropertyEngineService
+import com.normation.rudder.services.nodes.RudderPropertyEngine
+import com.normation.rudder.services.policies.PropertyParserTokens._
+import com.normation.zio.ZioRuntime
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.ConfigValue
+import net.liftweb.common._
+import zio.syntax.ToZio
+import cats.implicits._
+
 
 /**
  * A parser that handle parameterized value of
@@ -172,6 +179,7 @@ object PropertyParserTokens {
   final case class Param(path: List[String])       extends AnyVal with Interpolation
   //here, we keep the case as it is given
   final case class Property(path: List[String], opt: Option[PropertyOption]) extends Interpolation
+  final case class RudderEngine(engine: String, method: List[String], param:ConfigValue ) extends Interpolation
 
   //here, we have node property option
   sealed trait PropertyOption extends Any
@@ -186,6 +194,19 @@ object PropertyParserTokens {
 
 
 trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
+
+  // Not sure that should be here,
+  class SecretEngine extends RudderPropertyEngine {
+    override def name: String = "secret"
+
+    override def process(namespace: List[String], parameters: ConfigValue): IOResult[String] = "encrypted-string-test" .succeed //TODO add the logic here
+
+  }
+
+  // It will be GC often ?
+  val enginesService = new PropertyEngineService(
+    List(new SecretEngine)
+  )
 
   /*
    * Number of time we allows to recurse for interpolated variable
@@ -224,7 +245,8 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
     build _
   }
 
-  /*
+  /*u4i
+
    * The three following methods analyse token one by one and
    * given the token, build the function to execute to get
    * the final string (that may not succeed at run time, because of
@@ -236,6 +258,7 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
       case NonRudderVar(s)     => Right(s"$${${s}}")
       case NodeAccessor(path)  => getNodeAccessorTarget(context, path)
       case Param(path)         => getRudderGlobalParam(context, path)
+      case RudderEngine(e, m, p) => Right(ZioRuntime.runNow(enginesService.process(e, m, p)))
       case Property(path, opt) => opt match {
         case None =>
           getNodeProperty(context, path)
@@ -422,6 +445,7 @@ class InterpolatedValueCompilerImpl extends InterpolatedValueCompiler {
       case NonRudderVar(s)    => s"$${${s}}"
       case NodeAccessor(path) => s"$${rudder.node.${path.mkString(".")}}"
       case Param(name)         => s"$${rudder.param.${name}}"
+      case RudderEngine(e, m, p) => s"[missing value for: $${rudder.engine[${e}${m.mkString("][")}](${p.render()})}]"
       case Property(path, opt) => agent match {
         case AgentType.Dsc =>
           s"$$($$node.properties[${path.mkString("][")}])"
@@ -435,7 +459,8 @@ class InterpolatedValueCompilerImpl extends InterpolatedValueCompiler {
 
 object PropertyParser {
 
-  import fastparse._, NoWhitespace._
+  import fastparse._
+  import NoWhitespace._
 
   def parse(value: String): PureResult[List[Token]] = {
     fastparse.parse(value, all(_)) match {
@@ -482,10 +507,16 @@ object PropertyParser {
 
   //an interpolated variable looks like: ${rudder.XXX}, or ${RuDder.xXx}
   // after "${rudder." there is no backtracking to an "otherProp" or string possible.
-  def rudderVariable[_: P]  : P[Interpolation] = P( IgnoreCase("rudder") ~ space ~ "." ~ space ~/ (rudderNode | parameters | oldParameter) )
+  def rudderVariable[_: P]  : P[Interpolation] = P( IgnoreCase("rudder") ~ space ~ "." ~ space ~/ (rudderNode | parameters | oldParameter | rudderEngine) )
 
   //a node path looks like: ${rudder.node.HERE.PATH}
   def rudderNode[_: P]  : P[Interpolation] = P( IgnoreCase("node") ~/ space ~ "." ~ space ~/ variableId.rep(sep = space ~ "." ~ space) ).map { seq => NodeAccessor(seq.toList) }
+
+  def rudderEngine[_: P]  : P[Interpolation] = P(IgnoreCase("engine") ~/ arrayNames ~/ rudderEngineArg).map{
+    case (methods, arg) => RudderEngine(methods.head, methods.drop(1), arg.toConfigValue)
+  }
+
+  def rudderEngineArg[_: P]  : P[String] = P( space ~ "(" ~/ space ~/ ("\"" | "\"\"\"") ~/ propertyId ~/ space ~/ ("\"" | "\"\"\"") ~ space ~ ")" ~ space)
 
   //a parameter old syntax looks like: ${rudder.param.PARAM_NAME}
   def oldParameter[_: P]  : P[Interpolation] = P(IgnoreCase("param") ~ space ~ "." ~/ space ~/ variableId).map{ p => Param(p :: Nil) }
