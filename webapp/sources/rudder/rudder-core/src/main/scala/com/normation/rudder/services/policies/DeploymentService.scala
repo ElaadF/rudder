@@ -689,6 +689,7 @@ class PromiseGenerationServiceImpl (
   , override val postGenerationHookCompabilityMode: Option[Boolean]
   , override val GENERATION_FAILURE_MSG_PATH: String
   , override val allNodeCertificatesPemFile: File
+//  , override val propertyEngineService : PropertyEngineService
 ) extends PromiseGenerationService with
   PromiseGeneration_performeIO with
   PromiseGeneration_NodeCertificates with
@@ -759,7 +760,7 @@ trait PromiseGeneration_performeIO extends PromiseGenerationService {
   def interpolatedValueCompiler:InterpolatedValueCompiler
   def systemVarService: SystemVariableService
   def ruleApplicationStatusService: RuleApplicationStatusService
-
+//  def propertyEngineService : PropertyEngineService
   def getGlobalPolicyMode: () => Box[GlobalPolicyMode]
 
   override def findDependantRules() : Box[Seq[Rule]] = roRuleRepo.getAll(true).toBox

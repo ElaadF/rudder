@@ -58,6 +58,7 @@ import com.normation.errors._
 import cats.implicits._
 import com.normation.rudder.domain.nodes.GenericProperty
 import com.normation.rudder.domain.nodes.GenericProperty.StringToConfigValue
+import com.normation.rudder.services.nodes.PropertyEngineServiceImpl
 import com.normation.rudder.services.nodes.RudderPropertyEngine
 import com.typesafe.config.ConfigValue
 import net.liftweb.json.JsonDSL._
@@ -100,7 +101,13 @@ class TestNodeAndGlobalParameterLookup extends Specification {
   import NodeConfigData._
   //null is for RuleValService, only used in
   //rule lookup, node tested here.
-  val compiler = new InterpolatedValueCompilerImpl()
+  val propertyEngineService  = new PropertyEngineServiceImpl(
+    List (
+      new FakeEncryptedPasswordEngine
+    )
+  )
+
+  val compiler = new InterpolatedValueCompilerImpl(propertyEngineService)
   val lookupService = new RuleValServiceImpl(compiler)
   val data = new TestNodeConfiguration()
   val buildContext              = new PromiseGeneration_BuildNodeContext {
@@ -721,22 +728,152 @@ class TestNodeAndGlobalParameterLookup extends Specification {
       }
     }
 
-    "replace json parameter for secret engine" in {
-      val json =   {
-        (   ("login"           -> "admin")
-          ~ ("password"       -> "${rudder.engine[secret](\"someId\")}")
-          )
-      }
 
-      val jsonRes =   {
-        (   ("login"           -> "admin")
-          ~ ("password"       -> "encrypted-string-test")
-          )
-      }
-      //"""{"login": "admin","password": "${rudder.engine[secret](\"someId\")}"}"""
-      buildContext.parseJValue(json, toNodeContext(context, Map())) must beEqualTo(jsonRes)
+
+    "interpolate engine in JSON" in {
+      val before = """{"login":"admin", "password":"${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}"}"""
+      val after = """{"login":"admin", "password":"encrypted-string-test"}"""
+      buildContext.parseJValue(JsonParser.parse(before), toNodeContext(context, Map())) must beEqualTo(JsonParser.parse(after))
     }
 
+    // here interresting case : parseJValue fails and throws exception because
+    // def analyse(context: I, token:Token, propertyEngineService: PropertyEngineService): PureResult[String]
+    // fail to recognize engine
+    // I think we should log error and let the format unchanged, or change analyse to return IOResult[String] ?
+    //    ---> json and jsonRes should be equals in that case
+//    "interpolate unknown engine in JSON" in {
+//      val json = {
+//        (   ("login"    -> "admin")
+//          ~ ("password" -> "${rudder.engine[UNKNOWN](\"someId\")}")
+//          )
+//      }
+//
+//      val jsonRes =   {
+//        (   ("login"    -> "admin")
+//          ~ ("password" -> "${rudder.engine[UNKNOWN](\"someId\")}")
+//          )
+//      }
+//      buildContext.parseJValue(json, toNodeContext(context, Map())) must beFailure("()".r)
+//    }
+
+    "interpolate engine in nested JSON object" in {
+      val before =
+        """{
+          |  "login" : "admin",
+          |  "password" : {
+          |    "value" : "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}"
+          |  }
+          |}
+          |""".stripMargin
+
+      val after =
+        """{
+          |  "login" : "admin",
+          |  "password" : {
+          |    "value" : "encrypted-string-test"
+          |  }
+          |}
+          |""".stripMargin
+
+      buildContext.parseJValue(JsonParser.parse(before), toNodeContext(context, Map())) must beEqualTo(JsonParser.parse(after))
+    }
+
+    "interpolate engine in JSON array" in {
+      val before =
+        """{
+          |  "login" : "admin",
+          |  "data" : ["foo", "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}", "bar"]
+          |}
+          |""".stripMargin
+
+      val after =
+        """{
+          |  "login" : "admin",
+          |  "data" : ["foo", "encrypted-string-test", "bar"]
+          |}
+          |""".stripMargin
+      buildContext.parseJValue(JsonParser.parse(before), toNodeContext(context, Map())) must beEqualTo(JsonParser.parse(after))
+    }
+
+    "interpolate engine in nested JSON array" in {
+      val before =
+        """{
+          |  "login" : "admin",
+          |  "data" : [
+          |      {
+          |        "foo" : "bar"
+          |      },
+          |      "xzy",
+          |      {
+          |        "shouldBeInterpolated" : "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}"
+          |      }
+          |  ]
+          |}
+          |""".stripMargin
+
+      val after =
+        """{
+          |  "login" : "admin",
+          |  "data" : [
+          |      {
+          |        "foo" : "bar"
+          |      },
+          |      "xzy",
+          |      {
+          |        "shouldBeInterpolated" : "encrypted-string-test"
+          |      }
+          |  ]
+          |}
+          |""".stripMargin
+      buildContext.parseJValue(JsonParser.parse(before), toNodeContext(context, Map())) must beEqualTo(JsonParser.parse(after))
+    }
+
+    "interpolate engine multiple time" in {
+      val before =
+        """{
+          |  "login" : "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}",
+          |  "data" : [
+          |      {
+          |        "foo" : "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}"
+          |      },
+          |      "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}",
+          |      "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}",
+          |      {
+          |        "shouldBeInterpolated" : "${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}"
+          |      }
+          |  ]
+          |  "moreData" : {
+          |    "nestedStruct" : {
+          |       "array" : [{"value":"${rudder.engine[fakeEncryptorEngineTesting](\"someId\")}"}]
+          |    }
+          |  }
+          |
+          |}
+          |""".stripMargin
+
+      val after =
+        """{
+          |  "login" : "encrypted-string-test",
+          |  "data" : [
+          |      {
+          |        "foo" : "encrypted-string-test"
+          |      },
+          |      "encrypted-string-test",
+          |      "encrypted-string-test",
+          |      {
+          |        "shouldBeInterpolated" : "encrypted-string-test"
+          |      }
+          |  ]
+          |  "moreData" : {
+          |    "nestedStruct" : {
+          |       "array" : [{"value":"encrypted-string-test"}]
+          |    }
+          |  }
+          |}
+          |""".stripMargin
+
+      buildContext.parseJValue(JsonParser.parse(before), toNodeContext(context, Map())) must beEqualTo(JsonParser.parse(after))
+    }
   }
 
   "A single parameter" should {

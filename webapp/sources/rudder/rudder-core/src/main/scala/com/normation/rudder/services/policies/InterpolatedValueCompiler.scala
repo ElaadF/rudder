@@ -45,14 +45,11 @@ import com.normation.rudder.domain.nodes.GenericProperty
 import com.normation.rudder.domain.nodes.GenericProperty.StringToConfigValue
 import com.normation.rudder.domain.policies.PolicyModeOverrides
 import com.normation.rudder.services.nodes.PropertyEngineService
-import com.normation.rudder.services.nodes.RudderPropertyEngine
 import com.normation.rudder.services.policies.PropertyParserTokens._
 import com.normation.zio.ZioRuntime
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.ConfigValue
 import net.liftweb.common._
-import zio.syntax.ToZio
-import cats.implicits._
 
 
 /**
@@ -195,18 +192,7 @@ object PropertyParserTokens {
 
 trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
 
-  // Not sure that should be here,
-  class SecretEngine extends RudderPropertyEngine {
-    override def name: String = "secret"
 
-    override def process(namespace: List[String], parameters: ConfigValue): IOResult[String] = "encrypted-string-test" .succeed //TODO add the logic here
-
-  }
-
-  // It will be GC often ?
-  val enginesService = new PropertyEngineService(
-    List(new SecretEngine)
-  )
 
   /*
    * Number of time we allows to recurse for interpolated variable
@@ -233,11 +219,11 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
    * The funny part that for each token adds the interpretation of the token
    * by composing interpretation function.
    */
-  def parseToken(tokens:List[Token]): I => PureResult[String] = {
+  def parseToken(tokens:List[Token], propertyEngineService: PropertyEngineService): I => PureResult[String] = {
     def build(context: I) = {
       val init: PureResult[String] = Right("")
       (tokens).foldLeft(init) {
-        case (Right(str), token) => analyse(context, token).map(s => (str + s))
+        case (Right(str), token) => analyse(context, token, propertyEngineService).map(s => (str + s))
         case (Left(err) , _    ) => Left(err)
       }
     }
@@ -252,13 +238,13 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
    * the final string (that may not succeed at run time, because of
    * unknown parameter, etc)
    */
-  def analyse(context: I, token:Token): PureResult[String] = {
+  def analyse(context: I, token:Token, propertyEngineService: PropertyEngineService): PureResult[String] = {
     token match {
       case CharSeq(s)          => Right(s)
       case NonRudderVar(s)     => Right(s"$${${s}}")
       case NodeAccessor(path)  => getNodeAccessorTarget(context, path)
       case Param(path)         => getRudderGlobalParam(context, path)
-      case RudderEngine(e, m, p) => Right(ZioRuntime.runNow(enginesService.process(e, m, p)))
+      case RudderEngine(e, m, p) => Right(ZioRuntime.runNow(propertyEngineService.process(e, m, p)))
       case Property(path, opt) => opt match {
         case None =>
           getNodeProperty(context, path)
@@ -270,7 +256,7 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
           //we authorize to have default value = ${node.properties[bla][bla][bla]|node},
           //because we may want to use prop1 and if node set, prop2 at run time.
           for {
-            default <- parseToken(optionTokens)(context)
+            default <- parseToken(optionTokens, propertyEngineService)(context)
             prop    <- getNodeProperty(context, path) match {
                          case Left(_)  => Right(default)
                          case Right(s) => Right(s)
@@ -420,18 +406,18 @@ object AnalyseNodeInterpolation extends AnalyseInterpolation[ConfigValue, Interp
   }
 }
 
-class InterpolatedValueCompilerImpl extends InterpolatedValueCompiler {
+class InterpolatedValueCompilerImpl(propertyEngineService: PropertyEngineService) extends InterpolatedValueCompiler {
 
   /*
    * just call the parser on a value, and in case of successful parsing, interprete
    * the resulting AST (seq of token)
    */
   override def compile(value: String): PureResult[InterpolationContext => PureResult[String]] = {
-    PropertyParser.parse(value).map(AnalyseNodeInterpolation.parseToken)
+    PropertyParser.parse(value).map(t => AnalyseNodeInterpolation.parseToken(t, propertyEngineService))
   }
 
   override def compileParam(value: String): PureResult[ParamInterpolationContext => PureResult[String]] = {
-    PropertyParser.parse(value).map(AnalyseParamInterpolation.parseToken)
+    PropertyParser.parse(value).map(t => AnalyseParamInterpolation.parseToken(t, propertyEngineService))
   }
 
   def translateToAgent(value: String, agent : AgentType): Box[String] = {
