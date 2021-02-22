@@ -45,6 +45,7 @@ import com.normation.rudder.domain.nodes.GenericProperty
 import com.normation.rudder.domain.nodes.GenericProperty.StringToConfigValue
 import com.normation.rudder.domain.policies.PolicyModeOverrides
 import com.normation.rudder.services.nodes.PropertyEngineService
+import com.normation.rudder.services.nodes.PropertyEngineService
 import com.normation.rudder.services.policies.PropertyParserTokens._
 import com.normation.zio.ZioRuntime
 import com.typesafe.config.ConfigFactory
@@ -189,10 +190,17 @@ object PropertyParserTokens {
 
 }
 
+trait AnalyseInterpolationWithPropertyService {
+  def propertyEngineService: PropertyEngineService
+
+  def expandWithPropertyEngine(engineName: String , nameSpace: List[String], params: ConfigValue): IOResult[String] = {
+    propertyEngineService.process(engineName, nameSpace, params)
+  }
+}
 
 trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
 
-
+  def expandWithPropertyEngine(engineName: String , nameSpace: List[String], params: ConfigValue): IOResult[String]
 
   /*
    * Number of time we allows to recurse for interpolated variable
@@ -219,11 +227,11 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
    * The funny part that for each token adds the interpretation of the token
    * by composing interpretation function.
    */
-  def parseToken(tokens:List[Token], propertyEngineService: PropertyEngineService): I => PureResult[String] = {
+  def parseToken(tokens:List[Token]): I => PureResult[String] = {
     def build(context: I) = {
       val init: PureResult[String] = Right("")
       (tokens).foldLeft(init) {
-        case (Right(str), token) => analyse(context, token, propertyEngineService).map(s => (str + s))
+        case (Right(str), token) => analyse(context, token).map(s => (str + s))
         case (Left(err) , _    ) => Left(err)
       }
     }
@@ -231,20 +239,22 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
     build _
   }
 
-  /*u4i
+  /*
 
    * The three following methods analyse token one by one and
    * given the token, build the function to execute to get
    * the final string (that may not succeed at run time, because of
    * unknown parameter, etc)
    */
-  def analyse(context: I, token:Token, propertyEngineService: PropertyEngineService): PureResult[String] = {
+  def analyse(context: I, token:Token): PureResult[String] = {
     token match {
       case CharSeq(s)          => Right(s)
       case NonRudderVar(s)     => Right(s"$${${s}}")
       case NodeAccessor(path)  => getNodeAccessorTarget(context, path)
       case Param(path)         => getRudderGlobalParam(context, path)
-      case RudderEngine(e, m, p) => Right(ZioRuntime.runNow(propertyEngineService.process(e, m, p)))
+      case RudderEngine(e, m, p) =>
+          val io = expandWithPropertyEngine(e, m, p)
+        ZioRuntime.runNow(io.either)
       case Property(path, opt) => opt match {
         case None =>
           getNodeProperty(context, path)
@@ -256,7 +266,7 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
           //we authorize to have default value = ${node.properties[bla][bla][bla]|node},
           //because we may want to use prop1 and if node set, prop2 at run time.
           for {
-            default <- parseToken(optionTokens, propertyEngineService)(context)
+            default <- parseToken(optionTokens)(context)
             prop    <- getNodeProperty(context, path) match {
                          case Left(_)  => Right(default)
                          case Right(s) => Right(s)
@@ -336,7 +346,9 @@ trait AnalyseInterpolation[T, I <: GenericInterpolationContext[T]] {
 
 }
 
-object AnalyseParamInterpolation extends AnalyseInterpolation[ParamInterpolationContext => PureResult[String], ParamInterpolationContext] {
+class AnalyseParamInterpolation(p: PropertyEngineService)
+  extends AnalyseInterpolation[ParamInterpolationContext => PureResult[String], ParamInterpolationContext]
+    with AnalyseInterpolationWithPropertyService {
 
   /**
    * Retrieve the global parameter from the node context.
@@ -374,9 +386,13 @@ object AnalyseParamInterpolation extends AnalyseInterpolation[ParamInterpolation
       }
     }
   }
+
+  override def propertyEngineService: PropertyEngineService = p
 }
 
-object AnalyseNodeInterpolation extends AnalyseInterpolation[ConfigValue, InterpolationContext] {
+
+class AnalyseNodeInterpolation(p: PropertyEngineService)
+  extends AnalyseInterpolation[ConfigValue, InterpolationContext] with AnalyseInterpolationWithPropertyService {
 
   /**
    * Retrieve the global parameter from the node context.
@@ -404,20 +420,25 @@ object AnalyseNodeInterpolation extends AnalyseInterpolation[ConfigValue, Interp
       }
     }
   }
+
+  override def propertyEngineService: PropertyEngineService = p
 }
 
-class InterpolatedValueCompilerImpl(propertyEngineService: PropertyEngineService) extends InterpolatedValueCompiler {
+class InterpolatedValueCompilerImpl(p: PropertyEngineService) extends InterpolatedValueCompiler {
+
+  val analyseNode = new AnalyseNodeInterpolation(p)
+  val analyseParam = new AnalyseParamInterpolation(p)
 
   /*
    * just call the parser on a value, and in case of successful parsing, interprete
    * the resulting AST (seq of token)
    */
   override def compile(value: String): PureResult[InterpolationContext => PureResult[String]] = {
-    PropertyParser.parse(value).map(t => AnalyseNodeInterpolation.parseToken(t, propertyEngineService))
+    PropertyParser.parse(value).map(t => analyseNode.parseToken(t))
   }
 
   override def compileParam(value: String): PureResult[ParamInterpolationContext => PureResult[String]] = {
-    PropertyParser.parse(value).map(t => AnalyseParamInterpolation.parseToken(t, propertyEngineService))
+    PropertyParser.parse(value).map(t => analyseParam.parseToken(t))
   }
 
   def translateToAgent(value: String, agent : AgentType): Box[String] = {
@@ -431,7 +452,9 @@ class InterpolatedValueCompilerImpl(propertyEngineService: PropertyEngineService
       case NonRudderVar(s)    => s"$${${s}}"
       case NodeAccessor(path) => s"$${rudder.node.${path.mkString(".")}}"
       case Param(name)         => s"$${rudder.param.${name}}"
-      case RudderEngine(e, m, p) => s"[missing value for: $${rudder.engine[${e}${m.mkString("][")}](${p.render()})}]"
+      case RudderEngine(e, m, p) =>
+        // should not happen since a non expanded engine property should lead to an error
+        s"[missing value for: $${rudder.engine[${e}${m.mkString("][")}](${p.render()})}]"
       case Property(path, opt) => agent match {
         case AgentType.Dsc =>
           s"$$($$node.properties[${path.mkString("][")}])"

@@ -689,7 +689,6 @@ class PromiseGenerationServiceImpl (
   , override val postGenerationHookCompabilityMode: Option[Boolean]
   , override val GENERATION_FAILURE_MSG_PATH: String
   , override val allNodeCertificatesPemFile: File
-//  , override val propertyEngineService : PropertyEngineService
 ) extends PromiseGenerationService with
   PromiseGeneration_performeIO with
   PromiseGeneration_NodeCertificates with
@@ -760,7 +759,6 @@ trait PromiseGeneration_performeIO extends PromiseGenerationService {
   def interpolatedValueCompiler:InterpolatedValueCompiler
   def systemVarService: SystemVariableService
   def ruleApplicationStatusService: RuleApplicationStatusService
-//  def propertyEngineService : PropertyEngineService
   def getGlobalPolicyMode: () => Box[GlobalPolicyMode]
 
   override def findDependantRules() : Box[Seq[Rule]] = roRuleRepo.getAll(true).toBox
@@ -900,10 +898,6 @@ trait PromiseGeneration_BuildNodeContext {
           propsCompiled = mergedProps.map { p =>
                             p.copy(prop = NodeProperty(p.prop.config.getString("name"), parseJValue(p.prop.toJson, contextEngine).toString.toConfigValue, None, None))
                           }
-          _ <- effectUioUnit {mergedProps.foreach(p => println(p.prop.config))}.toBox
-          _ <- effectUioUnit(
-            println(s"======== JSON INTERPOLLATION : ${parseJValue(mergedProps(2).prop.toJson.\("value"), contextEngine).toString}")
-          ).toBox
           nodeInfo     =  info.modify(_.node.properties).setTo(propsCompiled.map(_.prop))
           nodeContext  <- systemVarService.getSystemVariables(nodeInfo, allNodeInfos, nodeTargets, globalSystemVariables, globalAgentRun, globalComplianceMode: ComplianceMode)
           // now we set defaults global parameters to all nodes

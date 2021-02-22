@@ -684,6 +684,7 @@ class TestNodeAndGlobalParameterLookup extends Specification {
       val p1value = compileAndGet("${rudder.param.p2}")
       val p2value = compileAndGet("${rudder.param.p3}")
       val p3value = compileAndGet("${rudder.param.p4}")
+      val analyseParam = new AnalyseParamInterpolation(propertyEngineService)
       val c = context.copy(parameters = Map(
           ("p1", p1value)
         , ("p2", p2value)
@@ -691,7 +692,7 @@ class TestNodeAndGlobalParameterLookup extends Specification {
         , ("p4", (i:ParamInterpolationContext) => Right(res))
       ))
 
-      (AnalyseParamInterpolation.maxEvaluationDepth == 5) and
+      (analyseParam.maxEvaluationDepth == 5) and
       (i(c) must beEqualTo(Right(res)))
     }
 
@@ -701,6 +702,7 @@ class TestNodeAndGlobalParameterLookup extends Specification {
       val p1value = compileAndGet("${rudder.param.p2}")
       val p2value = compileAndGet("${rudder.param.p3}")
       val p3value = compileAndGet("${rudder.param.p4}")
+      val analyseParam = new AnalyseParamInterpolation(propertyEngineService)
       val c = context.copy(parameters = Map(
           ("p1", p1value)
         , ("p2", p2value)
@@ -709,7 +711,7 @@ class TestNodeAndGlobalParameterLookup extends Specification {
         , ("p5", (i:ParamInterpolationContext) => Right(res))
       ))
 
-      (AnalyseParamInterpolation.maxEvaluationDepth == 5) and
+      (analyseParam.maxEvaluationDepth == 5) and
       (i(c) match {
         case Right(_) => ko("Was expecting an error due to too deep evaluation")
         case Left(_) => ok
@@ -736,25 +738,18 @@ class TestNodeAndGlobalParameterLookup extends Specification {
       buildContext.parseJValue(JsonParser.parse(before), toNodeContext(context, Map())) must beEqualTo(JsonParser.parse(after))
     }
 
-    // here interresting case : parseJValue fails and throws exception because
-    // def analyse(context: I, token:Token, propertyEngineService: PropertyEngineService): PureResult[String]
-    // fail to recognize engine
-    // I think we should log error and let the format unchanged, or change analyse to return IOResult[String] ?
-    //    ---> json and jsonRes should be equals in that case
-//    "interpolate unknown engine in JSON" in {
-//      val json = {
-//        (   ("login"    -> "admin")
-//          ~ ("password" -> "${rudder.engine[UNKNOWN](\"someId\")}")
-//          )
-//      }
-//
-//      val jsonRes =   {
-//        (   ("login"    -> "admin")
-//          ~ ("password" -> "${rudder.engine[UNKNOWN](\"someId\")}")
-//          )
-//      }
-//      buildContext.parseJValue(json, toNodeContext(context, Map())) must beFailure("()".r)
-//    }
+    "interpolate unknown engine in JSON" in {
+      val before =
+        """{
+          |  "login" : "admin",
+          |  "password" : {
+          |    "value" : "${rudder.engine[UNKNOWN](\"someId\")}"
+          |  }
+          |}
+          |""".stripMargin
+
+      buildContext.parseJValue(JsonParser.parse(before), toNodeContext(context, Map())) must beEqualTo(JsonParser.parse(before))
+    }
 
     "interpolate engine in nested JSON object" in {
       val before =

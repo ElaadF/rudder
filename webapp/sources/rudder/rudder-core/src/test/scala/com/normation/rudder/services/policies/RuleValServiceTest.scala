@@ -44,7 +44,6 @@ import com.normation.rudder.repository.FullActiveTechnique
 import com.normation.rudder.domain.policies.ActiveTechniqueId
 import com.normation.rudder.repository.FullActiveTechniqueCategory
 import com.normation.rudder.domain.policies.ActiveTechniqueCategoryId
-
 import scala.collection.SortedMap
 import org.joda.time.DateTime
 import com.normation.rudder.domain.policies.Directive
@@ -63,8 +62,7 @@ import com.normation.rudder.services.nodes.PropertyEngineServiceImpl
  */
 @RunWith(classOf[JUnitRunner])
 class RuleValServiceTest extends Specification {
-
-
+  
   /**
    * Instanciate the services
    */

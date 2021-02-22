@@ -39,8 +39,7 @@ class PropertyEngineServiceImpl(listOfEngine: List[RudderPropertyEngine]) extend
 
   def addEngine(engine: RudderPropertyEngine): UIO[Unit] = {
     for {
-      enginesMap <- engines.get
-      _          <- engines.set(enginesMap + (engine.name.toLowerCase -> engine))
+      _ <- engines.update(_ + (engine.name.toLowerCase -> engine))
     } yield ()
   }
 }
