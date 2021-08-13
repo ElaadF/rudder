@@ -1439,3 +1439,7 @@ ul.list-unstyled > li{
 .expandBlockChild:hover {
   opacity: 1;
 }
+/* override css inline in rendered HTML by elm-markdown */
+#__RENDERED_TEXT__ * {
+  background-color: transparent !important;
+}
