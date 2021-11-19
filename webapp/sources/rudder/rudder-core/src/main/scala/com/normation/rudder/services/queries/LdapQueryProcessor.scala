@@ -178,6 +178,7 @@ class AcceptedNodesLDAPQueryProcessor(
       timeres        =  (System.currentTimeMillis - timePreCompute)
       _              =  logger.debug(s"LDAP result: ${res.entries.size} entries obtained in ${timeres}ms for query ${query.toString}")
       ldapEntries    <- nodeInfoService.getLDAPNodeInfo(res.entries.flatMap(x => x(A_NODE_UUID).map(NodeId(_))).toSet, res.nodeFilters, query.composition)
+//      o              <- nodeInfoService.getPendingNodeInfo(res.entries.flatMap(x => x(A_NODE_UUID).map(NodeId(_))).toSet, res.nodeFilters, query.composition)
       ldapEntryTime  =  (System.currentTimeMillis - timePreCompute - timeres)
       _              =  logger.debug(s"[post-filter:rudderNode] Found ${ldapEntries.size} nodes when filtering for info service existence and properties (${ldapEntryTime} ms)")
 
@@ -302,10 +303,13 @@ class PendingNodesLDAPQueryChecker(
       LoggerFactory.getILoggerFactory.getLogger(Logger.loggerNameFor(classOf[InternalLDAPQueryProcessor])).debug(
         s"Checking a query with 0 criterium will always lead to 0 nodes: ${query}"
       )
+      println("vide")
       Full(Seq.empty[NodeId])
     } else {
+      println("pas vide")
       for {
         res <- checker.internalQueryProcessor(query, Seq("1.1"), Some(limitToNodeIds)).toBox
+        _   <- IOResult.effect(println(res)).toBox
         ids <- sequence(res.entries) { entry =>
           checker.ldapMapper.nodeDn2OptNodeId(entry.dn).toBox ?~! "Can not get node ID from dn %s".format(entry.dn)
         }
@@ -476,7 +480,9 @@ class InternalLDAPQueryProcessor(
       // If dnMapSets returns a None, then it means that we are ANDing composition with an empty value
       // so we skip the last query
       results  <- optdms match {
-                    case None      => Seq[LDAPEntry]().succeed
+                    case None      =>
+                      println("optmdn none")
+                      Seq[LDAPEntry]().succeed
                     case Some(dms) =>
                       (for {
                         // Ok, do the computation here
@@ -500,8 +506,12 @@ class InternalLDAPQueryProcessor(
                           tap(seq => logPure.debug(s"[${debugId}] `-> ${seq.size} results"))
                   }
       inverted <- query.transform match {
-                  case ResultTransformation.Identity => results.succeed
+                  case ResultTransformation.Identity =>
+                    println(results)
+                    println("world")
+                    results.succeed
                   case ResultTransformation.Invert   =>
+                    println("hello")
                     for {
                       _      <- logPure.debug(s"[${debugId}] |- (need to get all nodeIds for inversion) ")
                       allIds <- executeQuery(nodeObjectTypes.baseDn, nodeObjectTypes.scope, nodeObjectTypes.objectFilter, Some(ALL), Set(), Set(), nq.composition, debugId)

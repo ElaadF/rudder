@@ -958,6 +958,7 @@ object RudderConfig extends Loggable {
     , restExtractorService
     , restDataSerializer
     , queryProcessor
+    , inventoryQueryChecker
     , roAgentRunsRepository
   )
 
@@ -1496,6 +1497,14 @@ object RudderConfig extends Loggable {
     new InternalLDAPQueryProcessor(roLdap, acceptedNodesDitImpl, nodeDit, ditQueryDataImpl, ldapEntityMapper),
     nodeInfoServiceImpl
   )
+
+//  //query processor for pending nodes
+//  private[this] lazy val queryProcessorPendingNodes = new PendingNodesLDAPQueryProcessor(
+//    nodeDitImpl,
+//    pendingNodesDitImpl,
+//    new InternalLDAPQueryProcessor(roLdap, pendingNodesDitImpl, nodeDit, ditQueryDataImpl, ldapEntityMapper),
+//    nodeInfoServiceImpl
+//  )
 
   //we need a roLdap query checker for nodes in pending
   private[this] lazy val inventoryQueryChecker = new PendingNodesLDAPQueryChecker(
