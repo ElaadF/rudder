@@ -1,6 +1,7 @@
 module ViewMethod exposing (..)
 
 import DataTypes exposing (..)
+import Debug exposing (log)
 import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -337,8 +338,8 @@ callBody model ui techniqueUi call pid =
                 |> addClass "cursorMove"
                 |> Dom.appendChild
                            ( element "i"
-                             |> addClass "popover-bs fa"
-                             |> addClassConditional "fa-cog" (ui.mode == Closed)
+                             |> addClass "popover-bs fas"
+                             |> addClassConditional "fa-edit" (ui.mode == Closed)
                              |> addClassConditional "fa-check" (ui.mode == Opened)
                              |> addClass textClass
                              |> addStyleConditional ("font-style", "20px") (ui.mode == Opened)
@@ -407,7 +408,9 @@ callBody model ui techniqueUi call pid =
                    Closed -> element "div"
                              |> addClass "method-name"
                              |> appendChild
-                                ( element "span" |> appendText  (if (String.isEmpty call.component) then method.name else call.component )
+                                ( element "span"
+                                  |> addClass "name-content"
+                                  |> appendText  (if (String.isEmpty call.component) then method.name else call.component )
                                   |> addActionStopPropagation ("mousedown" , DisableDragDrop)
                                   |> addActionStopPropagation ("click" , DisableDragDrop)
                                 )
@@ -428,6 +431,7 @@ callBody model ui techniqueUi call pid =
                     |> appendChildList
                        [ element "label" |> appendText ((parameterName classParameter) ++ ": ")
                        , element "span"
+                         |> addClass "label-value"
                          |> appendText (displayValue paramValue)
                          |> addActionStopPropagation ("mousedown" , DisableDragDrop)
                          |> addActionStopPropagation ("click" , DisableDragDrop)
@@ -470,6 +474,7 @@ callBody model ui techniqueUi call pid =
                ]
           , element "div"
             |> addClass "flex-column"
+            |> addAction ("click",  UIMethodAction call.id {ui | mode = Opened})
             |> appendChildConditional condition (call.condition.os /= Nothing || call.condition.advanced /= "")
             |> appendChild methodName
             --|> appendChild methodNameId
