@@ -108,6 +108,21 @@ getAllCats category =
   in
     category :: (List.concatMap getAllCats subElems)
 
+-- get all missing categories
+getAllMissingCats: Category a -> List (Category a)
+getAllMissingCats category =
+  let
+    missingCategory = List.filter (\sub -> sub.id == "Missing") (getSubElems category)
+  in
+  List.concatMap getAllCats missingCategory
+
+-- get all rules who as an unknown category id
+getAllMissingCatsRules: Category a -> List a
+getAllMissingCatsRules category =
+  let
+    missingCategory = List.filter (\sub -> sub.id == "Missing") (getSubElems category)
+  in
+  List.concatMap getAllElems missingCategory
 
 type alias RuleComplianceGlobal =
   { id                : RuleId
