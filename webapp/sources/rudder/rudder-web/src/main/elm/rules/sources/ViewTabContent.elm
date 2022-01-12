@@ -23,7 +23,7 @@ import ViewUtils exposing (..)
 buildListCategories : String -> String -> String -> (Category Rule) -> List(Html Msg)
 buildListCategories sep categoryId parentId c =
   let
-    missingRootCategory = List.filter (\sub -> sub.id /= "Missing") (getSubElems c)
+    missingRootCategory = List.filter (\sub -> sub.id /= missingCategoryId) (getSubElems c)
   in
   if categoryId == c.id then
     []

@@ -42,12 +42,12 @@ view model =
     ruleTreeCategory item =
       let
         missingCat = getSubElems item
-          |> List.filter (\c -> c.id == "Missing")
+          |> List.filter (\c -> c.id == missingCategoryId)
           |> List.sortBy .name
           |> List.filterMap ruleTreeCategory
 
         categories = getSubElems item
-          |> List.filter (\c -> c.id /= "Missing")
+          |> List.filter (\c -> c.id /= missingCategoryId)
           |> List.sortBy .name
           |> List.filterMap ruleTreeCategory
 
@@ -58,13 +58,13 @@ view model =
 
         childsList  = ul[class "jstree-children"] (List.concat [categories, rules, missingCat] )
         mainMissingCat =
-          if(item.id == "Missing") then
+          if(item.id == missingCategoryId) then
             " main-missing-cat "
           else
             ""
         icons =
-          if(item.id == "Missing") then
-            " fas fa-question " ++ mainMissingCat
+          if(item.id == missingCategoryId) then
+            " fas fa-exclamation-triangle " ++ mainMissingCat
           else
             " fa fa-folder "
         missingCatClass = if(List.member item.id allMissingCategoriesId) then " missing-cat " else ""

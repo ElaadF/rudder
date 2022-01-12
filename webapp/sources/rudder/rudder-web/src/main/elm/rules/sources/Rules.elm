@@ -140,10 +140,10 @@ update msg model =
 
     OpenCategoryDetails category True ->
       let
-        allMissingCategories = List.filter (\sub -> sub.id == "Missing") (getSubElems model.rulesTree)
+        allMissingCategories = List.filter (\sub -> sub.id == missingCategoryId) (getSubElems model.rulesTree)
         listOfCat = List.concatMap getAllCats (allMissingCategories)
         listCatIdMissing = List.map (\r -> r.id) (listOfCat)
-        hasWriteRight = not (category == "Missing") && not (List.member category listCatIdMissing)
+        hasWriteRight = not (category == missingCategoryId) && not (List.member category listCatIdMissing)
         modelUI = model.ui
       in
       ({ model | ui = { modelUI | hasWriteRights = hasWriteRight} }, Cmd.batch [getRulesCategoryDetails model category, pushUrl ("ruleCategory" , category)])

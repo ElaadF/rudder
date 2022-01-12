@@ -368,7 +368,7 @@ class RuleApi(
   object GetRuleTreeV14 extends LiftApiModule0 {
     val schema = API.GetRuleTree
     def process0(version: ApiVersion, path: ApiPath, req: Req, params: DefaultParams, authzToken: AuthzToken): LiftResponse = {
-        serviceV14.getCategoryTree().toLiftResponseOne(params, schema, _.ruleCategories.id)
+      serviceV14.getCategoryTree().toLiftResponseOne(params, schema, _.ruleCategories.id)
     }
   }
 
