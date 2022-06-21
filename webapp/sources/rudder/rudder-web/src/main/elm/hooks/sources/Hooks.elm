@@ -1,4 +1,4 @@
-module Hooks exposing (..)
+port module Hooks exposing (..)
 
 import Browser
 import DataTypes exposing (..)
@@ -15,6 +15,12 @@ main = Browser.element
   , update        = update
   , subscriptions = subscriptions
   }
+
+port errorNotification   : String -> Cmd msg
+port successNotification : String -> Cmd msg
+port copy                : String -> Cmd msg
+port scroll              : String -> Cmd msg
+
 
 --
 -- update loop --
@@ -39,7 +45,7 @@ update msg model =
 
     GetHooksResult res ->
       case  res of
-        Ok (metadata, apiResult) ->
+        Ok (metadata, categoriesResult) ->
           let
             modelUi  = model.ui
             rootHooks = "/opt/rudder/etc/hooks.d"

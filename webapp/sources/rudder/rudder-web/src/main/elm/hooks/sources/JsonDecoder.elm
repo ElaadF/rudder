@@ -1,53 +1,45 @@
 module JsonDecoder exposing (..)
 
 import DataTypes exposing (..)
-import Dict exposing (Dict)
 import Json.Decode exposing (..)
 import Json.Decode.Pipeline exposing (..)
-import Json.Decode.Field exposing (..)
 import String exposing (join, split)
-import List exposing (drop, head)
+import List exposing (drop, head, reverse)
 
 
 -- GENERAL
 decodeGetHooks =
-  at [ "data" ] decodeResult
+  at [ "data" ] (Json.Decode.list <| decodeCategory)
 
-decodeResult : Decoder (ApiResult)
-decodeResult =
-  succeed ApiResult
-    |> required "root" string
-    |> required "events" decodeCategory
-
-decodeCategory : Decoder (List Category)
+decodeCategory : Decoder Category
 decodeCategory =
-  (dict (list decodeHook)) |> andThen dictToCategories
-
-dictToCategories : Dict String (List Hook) -> Decoder (List Category)
-dictToCategories dict =
-  Json.Decode.succeed (
-    Dict.toList dict
-      |> List.map (\(k, v) ->
-        let
-          kind =
-            if String.startsWith "node-" k then
-              Node
-            else if String.startsWith "policy-" k then
-              Policy
-            else
-              Other
-        in
-          Category k kind v
-      )
-  )
+  succeed Category
+    |> required "basePath" decodeCategoryName
+    |> hardcoded Other -- this parameter will be modified in GetHooksResult
+    |> required "hooksFile" (Json.Decode.list <| decodeHook)
 
 decodeHook : Decoder Hook
 decodeHook =
-  string|> andThen stringToHook
+  string |> andThen stringToHook
+
+decodeCategoryName : Decoder String
+decodeCategoryName =
+  string |> andThen (pathToCategoryName)
+
+pathToCategoryName : String -> Decoder String
+pathToCategoryName path =
+  let
+    lastElemOfPath = head (reverse (split "/" path))
+    categoryName =
+      case lastElemOfPath of
+        Just str -> str
+        Nothing -> "ERROR: missing hooks directories"
+   in
+   Json.Decode.succeed categoryName
 
 stringToHook : String -> Decoder Hook
-stringToHook str =
-  Json.Decode.succeed (Hook str)
+stringToHook name =
+   Json.Decode.succeed (Hook name)
 
 decodeErrorDetails : String -> (String, String)
 decodeErrorDetails json =

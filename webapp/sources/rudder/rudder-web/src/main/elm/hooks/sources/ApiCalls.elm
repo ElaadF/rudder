@@ -14,7 +14,7 @@ import Http.Detailed as Detailed
 
 getUrl: DataTypes.Model -> List String -> List QueryParameter -> String
 getUrl m url p=
-  Url.Builder.relative (m.contextPath :: "secure" :: "api" :: "system" :: url) p
+  Url.Builder.relative (m.contextPath :: "secure" :: "api" :: "hooks" :: url) p
 
 getHooks : Model -> Cmd Msg
 getHooks model =
@@ -23,7 +23,7 @@ getHooks model =
       request
         { method  = "GET"
         , headers = []
-        , url     = getUrl model [ "hooks" ] []
+        , url     = getUrl model [] []
         , body    = emptyBody
         , expect  = Detailed.expectJson GetHooksResult decodeGetHooks
         , timeout = Nothing

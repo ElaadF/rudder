@@ -22,10 +22,10 @@ type alias Filters =
   , state   : StateFilter
   }
 
-type alias ApiResult =
-  { root       : String
-  , categories : List Category
-  }
+--type alias ApiResult =
+--  { root       : String
+--  , categories : List Category
+--  }
 
 type Kind = Node | Policy | Other
 
@@ -48,7 +48,8 @@ type alias Model =
 
 type Msg
   = Copy String
+  | ScrollCategory String
   | CallApi (Model -> Cmd Msg)
-  | GetHooksResult (Result (Http.Detailed.Error String) ( Http.Metadata, ApiResult))
+  | GetHooksResult (Result (Http.Detailed.Error String) ( Http.Metadata, List Category))
   | Ignore
   | UpdateFilters Filters

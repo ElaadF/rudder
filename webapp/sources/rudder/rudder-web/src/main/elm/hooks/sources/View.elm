@@ -2,7 +2,7 @@ module View exposing (..)
 
 import DataTypes exposing (..)
 import Html exposing (..)
-import Html.Attributes exposing (class, id, href)
+import Html.Attributes exposing (attribute, class, href, id)
 import Html.Events exposing (onClick)
 import ViewUtils exposing (..)
 
@@ -29,7 +29,7 @@ view model =
         ]
       , div[ class "template-main"]
         [ div[ class "main-container"]
-          [ div[ class "main-details"]
+          [ div[ class "main-details", attribute "data-spy" "scroll", attribute "data-target" "#navbar-scrollspy"]
             [ displayHooksList model.root model.categories
             ]
           ]

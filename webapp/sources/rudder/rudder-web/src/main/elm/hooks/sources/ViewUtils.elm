@@ -32,10 +32,7 @@ displayHooksList root categories =
           li[]
           [ h3[id prefix][text title]
           , ul[class "category-sublist"](List.map (\c -> li[]
-            [ h4[id c.name]
-              [ text (humanize (String.replace prefix "" c.name))
-              , small[][text " ", text (root ++ "/"), b[][text c.name]]
-              ]
+            [ h4[id c.name] [ text (humanize (String.replace prefix "" c.name)) ]
             , ( if List.isEmpty c.hooks then
               text ""
             else
@@ -70,7 +67,7 @@ displayNavList categories =
             ]
           , ul[class "nav nav-tabs"] (
             List.map (\c -> li[]
-              [ a [href ( "#" ++ c.name )]
+              [ a [href ( "#" ++ c.name ), onClick (ScrollCategory c.name)]
                 [ text (humanize (String.replace prefix "" c.name))
                 ]
               ]
