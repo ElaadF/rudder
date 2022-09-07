@@ -2,6 +2,7 @@ module DataTypes exposing (..)
 
 import Dict exposing (Dict)
 import Http exposing (Error)
+import Http.Detailed
 import Time.ZonedDateTime exposing (ZonedDateTime)
 
 --
@@ -311,23 +312,23 @@ type Msg
   | NewCategory String
   | GetRepairedReport        RuleId Int
   | CallApi                  (Model -> Cmd Msg)
-  | GetRuleDetailsResult     (Result Error Rule)
-  | GetPolicyModeResult      (Result Error String)
-  | GetCategoryDetailsResult (Result Error (Category Rule))
-  | GetRulesComplianceResult (Result Error (List RuleComplianceGlobal))
-  | GetRuleNodesDirectivesResult RuleId (Result Error RuleNodesDirectives)
-  | GetRuleComplianceResult  RuleId (Result Error RuleCompliance)
-  | GetNodesList             (Result Error (List NodeInfo))
-  | SaveRuleDetails          (Result Error Rule)
-  | SaveDisableAction        (Result Error Rule)
-  | SaveCategoryResult       (Result Error (Category Rule))
-  | GetRulesResult           (Result Error (Category Rule))
-  | GetGroupsTreeResult      (Result Error (Category Group))
-  | GetRuleChanges           (Result Error (Dict String (List Changes)))
-  | GetRepairedReportsResult RuleId ZonedDateTime ZonedDateTime (Result Error (List RepairedReport))
-  | GetTechniquesTreeResult  (Result Error ((Category Technique, List Technique)))
-  | DeleteRule               (Result Error (RuleId, String))
-  | DeleteCategory           (Result Error (String, String))
+  | GetRuleDetailsResult     (Result (Http.Detailed.Error String) Rule)
+  | GetPolicyModeResult      (Result (Http.Detailed.Error String) String)
+  | GetCategoryDetailsResult (Result (Http.Detailed.Error String) (Category Rule))
+  | GetRulesComplianceResult (Result (Http.Detailed.Error String) (List RuleComplianceGlobal))
+  | GetRuleNodesDirectivesResult RuleId (Result (Http.Detailed.Error String) RuleNodesDirectives)
+  | GetRuleComplianceResult  RuleId (Result (Http.Detailed.Error String) RuleCompliance)
+  | GetNodesList             (Result (Http.Detailed.Error String) (List NodeInfo))
+  | SaveRuleDetails          (Result (Http.Detailed.Error String) Rule)
+  | SaveDisableAction        (Result (Http.Detailed.Error String) Rule)
+  | SaveCategoryResult       (Result (Http.Detailed.Error String) (Category Rule))
+  | GetRulesResult           (Result (Http.Detailed.Error String) (Category Rule))
+  | GetGroupsTreeResult      (Result (Http.Detailed.Error String) (Category Group))
+  | GetRuleChanges           (Result (Http.Detailed.Error String) (Dict String (List Changes)))
+  | GetRepairedReportsResult RuleId ZonedDateTime ZonedDateTime (Result (Http.Detailed.Error String) (List RepairedReport))
+  | GetTechniquesTreeResult  (Result (Http.Detailed.Error String) ((Category Technique, List Technique)))
+  | DeleteRule               (Result (Http.Detailed.Error String) (RuleId, String))
+  | DeleteCategory           (Result (Http.Detailed.Error String) (String, String))
   | DisableRule
   | CloneRule Rule RuleId
   | OpenDeletionPopup Rule

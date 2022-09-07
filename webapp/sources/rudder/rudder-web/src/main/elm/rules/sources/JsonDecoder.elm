@@ -5,6 +5,8 @@ import Dict exposing (Dict)
 import Json.Decode exposing (..)
 import Json.Decode.Pipeline exposing (..)
 import Json.Decode.Field exposing (..)
+import List exposing (drop, head)
+import String exposing (join, split)
 import Time.Iso8601
 import Time.Iso8601ErrorMsg
 import Time.TimeZones exposing (utc)
@@ -381,3 +383,17 @@ decodeRepairedReport =
     |> required "executionTimestamp" decodeTime
     |> required "executionDate" decodeTime
     |> required "message"   string
+
+decodeErrorDetails : String -> (String, String)
+decodeErrorDetails json =
+  let
+    errorMsg = decodeString (Json.Decode.at ["errorDetails"] string) json
+    msg = case errorMsg of
+      Ok s -> s
+      Err e -> "fail to process errorDetails"
+    errors = split "<-" msg
+    title = head errors
+  in
+  case title of
+    Nothing -> ("" , "")
+    Just s -> (s , (join " \n " (drop 1 (List.map (\err -> "\t ‣ " ++ err) errors))))

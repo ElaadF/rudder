@@ -2,6 +2,7 @@ module ApiCalls exposing (..)
 
 import DataTypes exposing (..)
 import Http exposing (..)
+import Http.Detailed as Detailed
 import JsonDecoder exposing (..)
 import JsonEncoder exposing (..)
 import Time.Iso8601
@@ -52,7 +53,7 @@ getRuleChanges model =
         , headers = []
         , url     = getUrl model [ "changes" ] []
         , body    = emptyBody
-        , expect  = expectJson GetRuleChanges decodeRuleChanges
+        , expect  = Detailed.expectJson GetRuleChanges decodeRuleChanges
         , timeout = Nothing
         , tracker = Nothing
         }

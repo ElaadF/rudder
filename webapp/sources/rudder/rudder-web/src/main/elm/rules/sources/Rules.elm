@@ -6,7 +6,9 @@ import Dict
 import Dict.Extra
 import DataTypes exposing (..)
 import Http exposing (..)
+import Http.Detailed as Detailed
 import Init exposing (init)
+import JsonDecoder exposing (decodeErrorDetails)
 import View exposing (view)
 import Result
 import ApiCalls exposing (..)
@@ -74,7 +76,8 @@ update msg model =
               , initTooltips ""
              )
         Err err ->
-          processApiError "Getting Rules tree" err model
+          (model, errorNotification  ("Error when getting rules: " ++ debugHttpErr err  ))
+          --processApiError "Getting Rules tree" err model
     GetPolicyModeResult res ->
       case res of
         Ok p ->
@@ -82,7 +85,7 @@ update msg model =
               , Cmd.none
             )
         Err err ->
-          processApiError "Getting Policy Mode" err model
+          (model, errorNotification  ("Error when getting policy mode: " ++ debugHttpErr err  ))
 
     GetGroupsTreeResult res ->
       case res of
@@ -91,7 +94,7 @@ update msg model =
             , Cmd.none
           )
         Err err ->
-          processApiError "Getting Groups tree" err model
+          (model, errorNotification  ("Error when getting rules tree: " ++ debugHttpErr err  ))
 
     GetTechniquesTreeResult res ->
       case res of
@@ -103,7 +106,7 @@ update msg model =
             , Cmd.none
           )
         Err err ->
-          processApiError "Getting Directives tree" err model
+          (model, errorNotification  ("Error when getting directives tree: " ++ debugHttpErr err  ))
 
     GetRuleDetailsResult res ->
       case res of
@@ -119,21 +122,21 @@ update msg model =
           in
             (newModel, Cmd.batch (getRulesComplianceDetails r.id newModel :: getRuleNodesDirectives r.id newModel :: getChanges) )
         Err err ->
-          processApiError "Getting Rule details" err model
+          (model, errorNotification  ("Error when getting rule details: " ++ debugHttpErr err  ))
 
     GetCategoryDetailsResult res ->
       case res of
         Ok c ->
           ({model | mode = CategoryForm (CategoryDetails (Just c) c (getParentCategoryId (getListCategories model.rulesTree) c.id) Information)}, Cmd.none)
         Err err ->
-          processApiError "Getting Rule category details" err model
+          (model, errorNotification  ("Error when getting rule category details: " ++ debugHttpErr err  ))
 
     GetNodesList res ->
       case res of
         Ok nodes ->
           ({model | nodes =  Dict.Extra.fromListBy (.id) nodes}, Cmd.none)
         Err err  ->
-          processApiError "Getting Nodes list" err model
+          (model, errorNotification  ("Error when getting node list: " ++ debugHttpErr err  ))
 
     OpenRuleDetails rId True ->
       let
@@ -158,14 +161,14 @@ update msg model =
         Ok r ->
           ( { model | rulesCompliance  =  Dict.Extra.fromListBy (.id >> .value)  r } , Cmd.none )
         Err err ->
-          processApiError "Getting compliance" err model
+          (model, errorNotification  ("Error when getting compliance: " ++ debugHttpErr err  ))
 
     GetRuleChanges res ->
       case res of
         Ok r ->
           ( { model | changes = r} , Cmd.none )
         Err err ->
-          processApiError "Getting changes" err model
+          (model, errorNotification  ("Error when getting changes: " ++ debugHttpErr err  ))
 
 
     GetRuleNodesDirectivesResult id res ->
@@ -180,8 +183,7 @@ update msg model =
             _ ->
                (model, Cmd.none)
         Err err ->
-         processApiError ("Getting rule nodes and directives of Rule "++ id.value) err model
-
+          (model, errorNotification  ("Error when getting rule nodes and directives of Rule: " ++ debugHttpErr err  ))
 
     GetRuleComplianceResult id res ->
       case res of
@@ -195,9 +197,7 @@ update msg model =
             _ ->
               (model, Cmd.none)
         Err err ->
-          processApiError ("Getting compliance details of Rule "++ id.value) err model
-
-
+          (model, errorNotification  ("Error when getting compliance details of Rule: " ++ debugHttpErr err  ))
 
     GetRepairedReportsResult id start end res ->
       case res of
@@ -211,9 +211,7 @@ update msg model =
             _ ->
               (model, Cmd.none)
         Err err ->
-          processApiError ("Getting changes  of Rule "++ id.value) err model
-
-
+          (model, errorNotification  ("Error when getting changes of Rule: " ++ debugHttpErr err  ))
 
     UpdateCategoryForm details ->
       case model.mode of
@@ -298,7 +296,7 @@ update msg model =
 
 
     SaveRuleDetails (Err err) ->
-      processApiError "Saving Rule" err model
+      (model, errorNotification  ("Error when saving Rule: " ++ debugHttpErr err  ))
 
     SaveDisableAction (Ok ruleDetails) ->
       case model.mode of
@@ -310,7 +308,7 @@ update msg model =
         _   -> (model, Cmd.none)
 
     SaveDisableAction (Err err) ->
-      processApiError "Changing rule state" err model
+      (model, errorNotification  ("Error when changing rule state: " ++ debugHttpErr err  ))
 
     SaveCategoryResult (Ok category) ->
       case model.mode of
@@ -327,7 +325,7 @@ update msg model =
         _   -> (model, Cmd.none)
 
     SaveCategoryResult (Err err) ->
-      processApiError "Saving Category" err model
+      (model, errorNotification  ("Error when saving category: " ++ debugHttpErr err  ))
 
     DeleteRule (Ok (ruleId, ruleName)) ->
       case model.mode of
@@ -340,7 +338,7 @@ update msg model =
         _ -> (model, Cmd.none)
 
     DeleteRule (Err err) ->
-      processApiError "Deleting Rule" err model
+      (model, errorNotification  ("Error when deleting Rule: " ++ debugHttpErr err  ))
 
     DeleteCategory (Ok (categoryId, categoryName)) ->
       case model.mode of
@@ -353,7 +351,7 @@ update msg model =
         _ -> (model, Cmd.none)
 
     DeleteCategory (Err err) ->
-      processApiError "Deleting category" err model
+      (model, errorNotification  ("Error when deleting category: " ++ debugHttpErr err  ))
 
     CloneRule rule ruleId ->
       let
@@ -497,5 +495,22 @@ processApiError apiName err model =
   in
     ({model | mode = if model.mode == Loading then RuleTable else model.mode, ui = { modelUi | loadingRules = False}}, errorNotification ("Error when "++apiName ++",details: \n" ++ message ) )
 
+
+debugHttpErr : Detailed.Error String -> String
+debugHttpErr error =
+    case error of
+        Detailed.BadUrl url ->
+            "The URL " ++ url ++ " was invalid"
+        Detailed.Timeout ->
+            "Unable to reach the server, try again"
+        Detailed.NetworkError ->
+            "Unable to reach the server, check your network connection"
+        Detailed.BadStatus metadata body ->
+          let
+            (title, errors) = decodeErrorDetails body
+          in
+          title ++ "\n" ++ errors
+        Detailed.BadBody metadata body msg ->
+            msg
 getUrl : Model -> String
 getUrl model = model.contextPath ++ "/secure/configurationManager/ruleManagement"
