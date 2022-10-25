@@ -16,12 +16,13 @@ import Random
 import UUID
 
 -- PORTS / SUBSCRIPTIONS
-port successNotification : String -> Cmd msg
-port errorNotification   : String -> Cmd msg
-port pushUrl             : (String,String) -> Cmd msg
-port initTooltips        : String -> Cmd msg
-port readUrl : ((String, String) -> msg) -> Sub msg
-port copy : String -> Cmd msg
+port successNotification      : String -> Cmd msg
+port errorNotification        : String -> Cmd msg
+port pushUrl                  : (String,String) -> Cmd msg
+port initTooltips             : String -> Cmd msg
+port readUrl                  : ((String, String) -> msg) -> Sub msg
+port copy                     : String -> Cmd msg
+port preventReloadingBehavior : () -> Cmd msg
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
@@ -139,7 +140,7 @@ update msg model =
       let
         modelUI = model.ui
       in
-      (model, Cmd.batch [getRuleDetails model rId, pushUrl ("rule", rId.value)])
+      (model, Cmd.batch [getRuleDetails model rId, pushUrl ("rule", rId.value), preventReloadingBehavior ()])
 
     OpenRuleDetails rId False ->
       (model, getRuleDetails model rId)
@@ -298,9 +299,10 @@ update msg model =
               , getRulesTree newModel
               , getRulesComplianceDetails ruleDetails.id newModel
               , getRuleNodesDirectives ruleDetails.id newModel
+              , preventReloadingBehavior()
               ]
             )
-        _   -> (model, Cmd.none)
+        _   -> (model, preventReloadingBehavior())
 
 
     SaveRuleDetails (Err err) ->

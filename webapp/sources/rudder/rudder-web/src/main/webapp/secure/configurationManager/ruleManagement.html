@@ -73,6 +73,12 @@
         });
       }, 950);
 
+      app.ports.preventReloadingBehavior.subscribe(function() {
+        $('.jstree-anchor').click(function (event) {
+          event.preventDefault();
+        });
+      });
+
     });
   </script>
 

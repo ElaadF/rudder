@@ -31,21 +31,22 @@ import AgentValueParser exposing (..)
 --
 -- Port for interacting with external JS
 --
-port copy                : String -> Cmd msg
-port storeDraft          : Value -> Cmd msg
-port clearDraft          : String  -> Cmd msg
-port getDrafts           : () -> Cmd msg
-port draftsResponse      : (Value -> msg) -> Sub msg
-port openManager         : String -> Cmd msg
-port updateResources     : (() -> msg) -> Sub msg
-port successNotification : String -> Cmd msg
-port errorNotification   : String -> Cmd msg
-port infoNotification    : String -> Cmd msg
-port pushUrl             : String -> Cmd msg
-port getUrl              : () -> Cmd msg
-port readUrl             : (String -> msg) -> Sub msg
-port clearTooltips       : String -> Cmd msg
-port scrollMethod        : (Bool , String) -> Cmd msg
+port copy                     : String -> Cmd msg
+port storeDraft               : Value -> Cmd msg
+port clearDraft               : String  -> Cmd msg
+port getDrafts                : () -> Cmd msg
+port draftsResponse           : (Value -> msg) -> Sub msg
+port openManager              : String -> Cmd msg
+port updateResources          : (() -> msg) -> Sub msg
+port successNotification      : String -> Cmd msg
+port errorNotification        : String -> Cmd msg
+port infoNotification         : String -> Cmd msg
+port pushUrl                  : String -> Cmd msg
+port getUrl                   : () -> Cmd msg
+port readUrl                  : (String -> msg) -> Sub msg
+port clearTooltips            : String -> Cmd msg
+port scrollMethod             : (Bool , String) -> Cmd msg
+port preventReloadingBehavior : () -> Cmd msg
 
 -- utility to write a understandable debug message from a get response
 debugHttpErr : Detailed.Error String -> String
@@ -167,7 +168,7 @@ selectTechnique model technique =
   in
     ({ model | mode = TechniqueDetails effectiveTechnique  state ui } )
       |> update OpenMethods
-      |> Tuple.mapSecond ( always ( Cmd.batch [ getRessources state model, action  ]  ))
+      |> Tuple.mapSecond ( always ( Cmd.batch [ getRessources state model, action, preventReloadingBehavior ()  ]  ))
 
 generator : Random.Generator String
 generator = Random.map (UUID.toString) UUID.generator
@@ -206,7 +207,7 @@ update msg model =
       ( model , Cmd.none )
 
     GetTechniques (Ok  (metadata, techniques)) ->
-      ({ model | techniques = techniques, loadingTechniques = False},  getUrl () )
+      ({ model | techniques = techniques, loadingTechniques = False},  Cmd.batch[getUrl (), preventReloadingBehavior()])
     GetTechniques (Err err) ->
       ({ model | loadingTechniques = False} , errorNotification  ("Error when getting techniques: " ++ debugHttpErr err  ) )
 
@@ -314,7 +315,7 @@ update msg model =
             m -> (m, technique.id)
         drafts = Dict.remove idToClean.value model.drafts
       in
-        ({ model | techniques = techniques, mode = newMode, drafts = drafts}, Cmd.batch [ clearDraft idToClean.value, successNotification "Technique saved!", pushUrl technique.id.value] )
+        ({ model | techniques = techniques, mode = newMode, drafts = drafts}, Cmd.batch [ clearDraft idToClean.value, successNotification "Technique saved!", pushUrl technique.id.value, preventReloadingBehavior ()] )
 
     SaveTechnique (Err err) ->
       ( model , errorNotification ("Error when saving technique: " ++ debugHttpErr err ) )
