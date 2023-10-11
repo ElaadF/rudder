@@ -16,7 +16,7 @@ import List.Extra
 -- Port for interacting with external JS
 --
 port successNotification : String -> Cmd msg
-port errorNotification   : String -> Cmd msg
+--port errorNotification   : String -> Cmd msg
 
 main =
   Browser.element
@@ -75,7 +75,7 @@ update msg model =
           in
             (newModel, Cmd.none)
         Err _ ->
-          (model, (errorNotification "Error while fetching account credentials"))
+          (model, (successNotification "Error while fetching account credentials"))
 {-
     GetMetricsSettings res ->
       case res of
@@ -140,4 +140,4 @@ actionsAfterSaving model =
         (True, False) -> "Error while saving metrics"
         _             -> "Error while saving your changes"
     in
-      errorNotification errMessage
+      successNotification errMessage

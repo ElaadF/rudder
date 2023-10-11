@@ -127,7 +127,7 @@ class SearchNodeComponent(
    * Page/component which includes SearchNodeComponent can use it.
    * @return
    */
-  def getSrvList(): Box[Seq[NodeInfo]] = srvList
+  def getSrvList(): Box[Seq [NodeInfo]] = srvList
 
   /**
    * External exposition of the current state of query.
@@ -227,10 +227,16 @@ class SearchNodeComponent(
       lines.append(cl)
 
       val initJs          = cl.attribute.cType.initForm("v_" + index)
+//      val inputAttributes = List(("hello" , "world"), ("toto", "titi"))
       val inputAttributes = ("id", "v_" + index) :: ("class", "queryInputValue form-control input-sm") :: {
         if (cl.comparator.hasValue) Nil else ("disabled", "disabled") :: Nil
       }
-      val input           = cl.attribute.cType.toForm(cl.value, (x => lines(index) = lines(index).copy(value = x)), inputAttributes: _*)
+      println(s"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ $inputAttributes")
+      println(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!${cl.value}")
+      println(s"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& ${lines(index)}")
+
+      val input           = cl.attribute.cType.toForm(cl.value, (x => lines(index) = lines(index).copy(value = "toto")), inputAttributes: _*)
+      println(s"****************************************************************************************************************** $input")
       (".removeLine *" #> {
         if (addRemove)
           SHtml.ajaxSubmit("-", () => removeLine(index), ("class", "removeLineButton btn btn-danger btn-xs"))
@@ -494,30 +500,45 @@ object SearchNodeComponent {
         }
       case Nil    => ""
     }
-    comp.destroyForm(v_eltid) &
-    JsRaw(
-      "jQuery('#%s').replaceWith('%s')".format(
-        v_eltid,
-        comp.toForm(v_old, func, ("id" -> v_eltid), ("class" -> "queryInputValue form-control input-sm"))
-      )
-    ) &
-    comp.initForm(v_eltid) &
-    JsCmds.ReplaceOptions(c_eltid, comparators, Full(selectedComp)) &
-    setIsEnableFor(selectedComp, v_eltid) &
-    OnLoad(JsVar("""
+    println(s"et là ?")
+    println(s"v_eltid $v_eltid")
+    println(s"v_old '$v_old")
+    val test0 = comp.destroyForm(v_eltid)
+    println("test0")
+    val de = comp.toForm(v_old, func, ("id" -> v_eltid), ("class" -> "queryInputValue form-control input-sm"))
+    val test1 = JsRaw(s"jQuery('${v_eltid}').replaceWith('fren')")
+
+    println(s"test1")
+
+    val test2 = comp.initForm(v_eltid)
+    println("test2")
+
+    val test3 = JsCmds.ReplaceOptions(c_eltid, comparators, Full(selectedComp))
+    println("test3")
+
+    val test4 = setIsEnableFor(selectedComp, v_eltid)
+    println("test4")
+
+    val test5 = OnLoad(JsVar("""
         $(".queryInputValue").keydown( function(event) {
           processKey(event , 'SubmitSearch')
         } );
         """))
+    println("test5")
+
+    test0 & test1 & test2 & test3 & test4 & test5
   }
 
   def replaceAttributes(func: String => Any)(ajaxParam: String): JsCmd = {
     parseAttrParam(ajaxParam) match {
       case None                                                             => Alert("Can't parse for attribute: " + ajaxParam)
       case Some((ot, a_eltid, a_oldVal, c_eltid, c_oldVal, v_eltid, v_old)) =>
+        println("coucou toi")
         // change attribute list
+//        val attributes   = optionAttributesFor(ot)
         val attributes   = optionAttributesFor(ot)
         val attrNames    = attributes.map(_._1)
+//        val attrNames    = List("dei", "deji")
         val selectedAttr = attrNames match {
           case a :: _ =>
             attrNames.filter(_ == a_oldVal) match {
@@ -526,8 +547,11 @@ object SearchNodeComponent {
             }
           case Nil    => ""
         }
+        println(s"attribues : $attributes")
+        println(s"attrNames : $attrNames")
+        println(s"selectedAttr : $selectedAttr")
 
-        JsCmds.ReplaceOptions(a_eltid, attributes, Full(selectedAttr)) &
+        JsCmds.ReplaceOptions(a_eltid, attributes, Full(  selectedAttr)) &
         updateCompAndValue(func, ot, selectedAttr, c_eltid, c_oldVal, v_eltid, v_old)
     }
   }
@@ -549,10 +573,16 @@ object SearchNodeComponent {
 
   // expected "newObjectTypeValue,attributeSelectEltId,oldAttrValue,comparatorSelectEltId,oldCompValue,valueSelectEltId,oldValue
   def ajaxAttr(lines: Buffer[CriterionLine], i: Int) = {
+    val test =  """this.value+',at_%s,'+%s+',ct_%s,'+ %s +',v_%s,'+%s"""
+      .format(i, ValById("at_" + i).toJsCmd, i, ValById("ct_" + i).toJsCmd, i, Str("").toJsCmd)
+
+
+//    val test2 =  s"""this.value+',at_${i},'+${ValById("at_" + i).toJsCmd}+',ct_${i},'+ ${ValById("ct_" + i).toJsCmd} +',v_${i},'${Str("").toJsCmd}"""
+//      .format(i, ValById("at_" + i).toJsCmd, i, ValById("ct_" + i).toJsCmd, i, Str("").toJsCmd)
+//    println(s"888888888888888888888 $test2")
     SHtml.ajaxCall( // we we change the attribute, we want to reset the value, see issue #1199
       JE.JsRaw(
-        "this.value+',at_%s,'+%s+',ct_%s,'+ %s +',v_%s,'+%s"
-          .format(i, ValById("at_" + i).toJsCmd, i, ValById("ct_" + i).toJsCmd, i, Str("").toJsCmd)
+        test
       ),
       s => After(TimeSpan(200), replaceAttributes(x => lines(i) = lines(i).copy(value = x))(s))
     )
@@ -564,7 +594,7 @@ object SearchNodeComponent {
         "%s+','+this.value+',ct_%s,'+ %s +',v_%s,'+%s"
           .format(ValById("ot_" + i).toJsCmd, i, ValById("ct_" + i).toJsCmd, i, Str("").toJsCmd)
       ),
-      s => After(TimeSpan(200), replaceComp(x => lines(i) = lines(i).copy(value = x))(s))
+      s => After(TimeSpan(200), replaceComp(x => lines(i) = lines(i).copy(value = xml.Utility.escape(x)))(s))
     )
   }
   // expect "newCompValue,valueSelectEltId"
@@ -622,6 +652,10 @@ object SearchNodeComponent {
   }
 
   def objectTypeSelect(ot: ObjectCriterion, lines: Buffer[CriterionLine], i: Int): NodeSeq = {
+    println(s"======================================================================== ${ot.criteria}")
+    println(s"======================================================================== ${otOptions}")
+    println(s"======================================================================== lines ${lines}")
+//    <div>hello</div>
     SHtml.untrustedSelect(
       otOptions,
       Full(ot.objectType),
@@ -635,6 +669,9 @@ object SearchNodeComponent {
   }
 
   def attributeNameSelect(ot: ObjectCriterion, a: Criterion, lines: Buffer[CriterionLine], i: Int): NodeSeq = {
+    println(s"444444444444444444444444444444444444444444444444444444444444444444444444 ${ot}")
+    println(s"55555555555555555555555555555555555555555555555555555555555555555555555555555 ${a}")
+    println(s"777777777777777777777777777777777777777777777777777777777777777777777777777 ${lines}")
     SHtml.untrustedSelect(
       optionAttributesFor(ot.objectType),
       Full(a.name),
