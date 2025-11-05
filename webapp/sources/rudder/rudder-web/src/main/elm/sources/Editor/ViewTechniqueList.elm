@@ -186,6 +186,8 @@ draftsItem model draft =
 techniqueItem: Model -> Technique -> Html Msg
 techniqueItem model technique =
   let
+    isDirectiveExist = List.any (\d -> d.techniqueName ==  technique.id.value) model.directives
+    techniqueIsUsed = if isDirectiveExist then "used" else ""
     techniqueMethods = List.concatMap allMethodCalls technique.elems
     unknownMethods = (List.filter (\c -> Maybe.Extra.isNothing (Dict.get c.methodName.value model.methods)) techniqueMethods)
     activeClass = case model.mode of
@@ -210,7 +212,7 @@ techniqueItem model technique =
     li [class "jstree-node jstree-leaf"]
           [ i[class "jstree-icon jstree-ocl"][]
           , a[class ("jstree-anchor " ++ activeClass), href (model.contextPath ++ "/secure/configurationManager/techniqueEditor/technique/" ++ technique.id.value), onClickPreventDefault (SelectTechnique (Left technique))]
-            [ i [class "jstree-icon jstree-themeicon fa fa-cog jstree-themeicon-custom"][]
+            [ i [class ("jstree-icon jstree-themeicon fa fa-cog jstree-themeicon-custom " ++ techniqueIsUsed)][]
             , span [class "treeGroupName"]
               [ text technique.name  ]
             , if Dict.member technique.id.value model.drafts then

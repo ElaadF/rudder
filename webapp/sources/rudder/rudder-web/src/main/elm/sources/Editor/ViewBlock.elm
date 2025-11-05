@@ -429,6 +429,9 @@ blockBody model parentId block ui techniqueUi =
           Nothing -> "gm-label-default"
           Just Audit -> "label-audit"
           Just Enforce -> "label-enforce"
+          Just Default -> ""
+
+
 
 
 
@@ -467,6 +470,7 @@ blockBody model parentId block ui techniqueUi =
                                                Nothing -> "None"
                                                Just Enforce -> " "
                                                Just Audit -> " "
+                                               Just Default -> " "
                                              )
                              , element "ul"
                                |> addClass "dropdown-menu"
